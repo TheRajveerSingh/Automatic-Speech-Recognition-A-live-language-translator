@@ -9,6 +9,20 @@ mic ─► Clean audio ─► log-Mel ─► Recognize ─► Translate ─► S
        (our DSP+VAD)  (our code)  (Whisper)   (Ollama LLM)  (Edge voices / XTTS your voice)
 ```
 
+![Translate tab](docs/screenshots/translate.png)
+
+## Screenshots
+| | |
+|---|---|
+| **Conversation** - two people, two languages; hands-free mode detects who is speaking<br>![Conversation](docs/screenshots/conversation.png) | **Summarize** - TL;DR, action items and clickable chapters from a meeting video<br>![Summarize](docs/screenshots/summary.png) |
+| **Under the hood: log-Mel** - our own feature extraction, verified identical to Whisper's<br>![log-Mel spectrogram](docs/screenshots/hood-logmel.png) | **Under the hood: cleaning** - filter response and frame-by-frame voice activity detection<br>![Audio cleaning](docs/screenshots/hood-cleaning.png) |
+| **Under the hood: decoding** - language probabilities, tokens and per-word confidence<br>![Decoding](docs/screenshots/hood-decoding.png) | **Add my voice** - generated phonetically-rich script for voice cloning<br>![Voice lab](docs/screenshots/voice-lab.png) |
+
+**Benchmark** - WER / CER / speed per model, with and without our audio cleaning, plus confidence calibration.
+_(This example run uses 10 sentences read by generated test voices - see [Accuracy on my voice](#accuracy-on-my-voice) for real numbers.)_
+
+![Benchmark](docs/screenshots/benchmark.png)
+
 ## Features (one tab each)
 | Tab | What it does |
 |---|---|
@@ -55,8 +69,10 @@ Open http://localhost:8000 in Chrome or Edge and wait for the green dot.
 - Terminal benchmark: `python -m eval.evaluate_wer --models tiny,small,large-v3-turbo`
 
 ## Accuracy on my voice
-Record a test set on the **Benchmark** tab, run it, click **Copy as Markdown** and paste the table here.
-(Numbers describe one speaker, one microphone and one room - not Whisper in general.)
+_Coming soon: measured on my own recordings with the Benchmark tab (30+ sentences)._
+<!-- Benchmark tab → record ~30 sentences → Run → "Copy as Markdown" → paste the table here -->
+
+These numbers describe one speaker, one microphone and one room - not Whisper in general.
 
 ## GPU memory (RTX 4060 Laptop, 8 GB)
 Whisper + Gemma ≈ 3.9 GB; with XTTS loaded too ≈ 6.3 GB.
@@ -69,6 +85,9 @@ Generated audio in `outputs/` is deleted automatically after 24 h (`OUTPUT_MAX_A
 - No speaker identification: summaries say "Speaker"/"I" when a task isn't tied to a name.
 - Conversation hands-free mode works best with headphones (speaker echo can trigger the VAD).
 - Edge voices need internet; everything else is offline.
+- Your-own-voice (XTTS) is the slowest step: roughly 1-2 s per second of speech on a laptop GPU. On some laptops the
+  NVIDIA driver lowers the GPU clock during XTTS; setting **NVIDIA Control Panel → Manage 3D settings → Power management
+  mode → Prefer maximum performance** for `python.exe` can help.
 
 ## Removing the voice-cloning feature (frees ~4.5 GB)
 ```bash
@@ -76,5 +95,9 @@ pip uninstall -y coqui-tts coqui-tts-trainer torch torchaudio torchcodec
 ```
 Then delete `%USERPROFILE%\.cache\huggingface\hub\models--tts-hub--XTTS-v2` and this project's `models/` folder.
 
-## Licences
-Code: your choice (add a LICENSE before publishing). XTTS-v2 model: Coqui Public Model License (non-commercial).
+## Licence
+The code is released under the [MIT License](LICENSE). The AI models it downloads keep their own licences:
+Whisper (MIT), Gemma ([Gemma Terms of Use](https://ai.google.dev/gemma/terms)) and XTTS-v2
+([Coqui Public Model License](https://coqui.ai/cpml) - **non-commercial use only**).
+
+Inspired by [vndee/local-talking-llm](https://github.com/vndee/local-talking-llm).
