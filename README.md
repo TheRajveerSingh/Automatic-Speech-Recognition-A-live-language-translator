@@ -111,4 +111,3 @@ The code is released under the [MIT License](LICENSE). The AI models it download
 Whisper (MIT), Gemma ([Gemma Terms of Use](https://ai.google.dev/gemma/terms)) and XTTS-v2
 ([Coqui Public Model License](https://coqui.ai/cpml) - **non-commercial use only**).
 
-Inspired by [vndee/local-talking-llm](https://github.com/vndee/local-talking-llm).
