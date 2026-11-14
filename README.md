@@ -71,9 +71,9 @@ Open http://localhost:8000 in Chrome or Edge and wait for the green dot.
 - Terminal benchmark: `python -m eval.evaluate_wer --models tiny,small,large-v3-turbo`
 
 ## Tests
-64 automated tests cover the logic that doesn't need a GPU: WER/CER scoring and text normalisation, number spelling
+68 automated tests cover the logic that doesn't need a GPU: WER/CER scoring and text normalisation, number spelling
 for Hindi/Chinese voice cloning, the audio front-end (filter, normalisation, VAD) on synthetic signals, the voice-enrolment
-script and checks, and transcript chunking for summaries. They run on GitHub on every push (badge above).
+script and checks, transcript chunking for summaries, and the translation prompt's safeguards. They run on GitHub on every push (badge above).
 ```bash
 pip install -r requirements-dev.txt
 pytest
