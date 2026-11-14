@@ -1,0 +1,29 @@
+# NOTE: in .gitignore a "#" only starts a comment at the beginning of a line.
+
+# --- personal data: NEVER commit ---
+# your enrolled voice recordings + voice profiles
+voices/
+# your benchmark recordings
+eval/datasets/
+# local settings / secrets (see .env.example)
+.env
+
+# --- generated files ---
+# generated speech
+outputs/
+# benchmark result files
+eval/results/
+# coqui-tts housekeeping
+models/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.pytest_cache/
+
+# --- editors / OS ---
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

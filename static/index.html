@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Voice Translator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" class="brand-icon" aria-hidden="true"><path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 11v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+      <span>Voice Translator</span>
+    </div>
+    <nav class="tabs" role="tablist">
+      <a href="#translate" class="tab active" data-page="translate">Translate</a>
+      <a href="#talk" class="tab" data-page="talk">Conversation</a>
+      <a href="#summary" class="tab" data-page="summary">Summarize</a>
+      <a href="#hood" class="tab" data-page="hood">Under the hood</a>
+      <a href="#bench" class="tab" data-page="bench">Benchmark</a>
+    </nav>
+    <div id="status" class="status" title="Loading models…">
+      <span class="dot"></span><span id="status-text">Loading models…</span>
+    </div>
+  </header>
+
+  <!-- =================================================================== TRANSLATE PAGE -->
+  <main class="wrap page" id="page-translate">
+    <section class="card input-card">
+      <div class="lang-row">
+        <label class="field">
+          <span>I'm speaking</span>
+          <select id="source"><option value="auto">Auto-detect</option></select>
+        </label>
+        <button id="swap" class="icon-btn" title="Swap languages" aria-label="Swap languages">
+          <svg viewBox="0 0 24 24"><path d="M7 7h11l-3-3M17 17H6l3 3" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <label class="field">
+          <span>Translate to</span>
+          <select id="target"></select>
+        </label>
+      </div>
+
+      <div class="voice-row">
+        <label class="field grow">
+          <span>Voice</span>
+          <div class="inline">
+            <select id="voice"></select>
+            <button id="preview" class="icon-btn" title="Preview voice" aria-label="Preview voice">
+              <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+            </button>
+          </div>
+        </label>
+        <label class="field slider">
+          <span>Speed <b id="rate-val" class="mono">+0%</b></span>
+          <input type="range" id="rate" min="-50" max="50" step="5" value="0" />
+        </label>
+        <label class="field slider">
+          <span>Pitch <b id="pitch-val" class="mono">+0 Hz</b></span>
+          <input type="range" id="pitch" min="-20" max="20" step="2" value="0" />
+        </label>
+        <button id="add-voice" class="btn ghost add-voice" hidden>+ Add my voice</button>
+      </div>
+
+      <div class="recorder" id="recorder">
+        <canvas id="wave" aria-hidden="true"></canvas>
+        <button id="mic" class="mic" aria-label="Start recording">
+          <svg class="mic-icon" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+          <svg class="stop-icon" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></svg>
+        </button>
+        <div class="rec-meta">
+          <span id="timer" class="mono">0:00</span>
+          <span id="hint">Click the mic or press <kbd>Space</kbd> to record</span>
+        </div>
+      </div>
+      <div class="upload-row">
+        <label class="link-btn">
+          <input type="file" id="file" accept="audio/*" hidden />
+          or upload an audio file
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <ol class="steps" id="steps">
+        <li data-stage="preprocess"><span class="node"></span><b>Clean audio</b><small>noise filter · VAD</small><em class="ms"></em></li>
+        <li data-stage="recognize"><span class="node"></span><b>Recognize</b><small>Whisper ASR</small><em class="ms"></em></li>
+        <li data-stage="translate"><span class="node"></span><b>Translate</b><small>local LLM</small><em class="ms"></em></li>
+        <li data-stage="speak"><span class="node"></span><b>Speak</b><small>neural voice</small><em class="ms"></em></li>
+      </ol>
+      <p class="hood-link"><a href="#hood">See every calculation behind this →</a></p>
+    </section>
+
+    <section class="results">
+      <article class="card result" id="heard">
+        <header>
+          <h2>What you said</h2>
+          <span class="badge" id="detected" hidden></span>
+        </header>
+        <div class="transcript" id="transcript"><p class="placeholder">Your words will appear here.</p></div>
+        <textarea id="edit-box" hidden rows="3"></textarea>
+        <div class="meter-row" id="conf-row" hidden>
+          <span>Confidence</span>
+          <div class="meter"><i id="conf-bar"></i></div>
+          <span class="mono" id="conf-val"></span>
+        </div>
+        <p class="legend" id="legend" hidden><mark>highlighted</mark> words were uncertain - click <b>Edit</b> to fix them.</p>
+        <div class="actions">
+          <button class="btn ghost" id="edit-btn" disabled>Edit</button>
+          <button class="btn" id="retranslate-btn" hidden>Re-translate</button>
+        </div>
+      </article>
+
+      <article class="card result" id="translated">
+        <header>
+          <h2>Translation</h2>
+          <span class="badge accent" id="target-badge" hidden></span>
+        </header>
+        <div class="translation" id="translation"><p class="placeholder">The translation will appear here.</p></div>
+        <div class="player" id="player" hidden>
+          <button class="play" id="play" aria-label="Play translation">
+            <svg class="play-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+            <svg class="pause-icon" viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"/></svg>
+          </button>
+          <div class="progress"><i id="play-bar"></i></div>
+          <a class="icon-btn" id="download" download title="Download audio" aria-label="Download audio">
+            <svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+          <button class="icon-btn" id="copy" title="Copy text" aria-label="Copy text">
+            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="2" fill="none"/><path d="M5 15V5a1 1 0 0 1 1-1h9" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+          </button>
+        </div>
+        <p class="voice-note" id="voice-note" hidden></p>
+        <audio id="audio" preload="auto"></audio>
+      </article>
+    </section>
+  </main>
+
+  <!-- =================================================================== UNDER THE HOOD PAGE -->
+  <main class="wrap page hood" id="page-hood" hidden>
+    <section class="card hood-intro">
+      <div>
+        <h1>Under the hood</h1>
+        <p>Every chart and number on this page is computed live from your last recording - nothing is a mock-up.
+          Follow the sound from your microphone, through our audio front-end, into Whisper's neural network, through the LLM and back out as speech.</p>
+      </div>
+      <button class="btn" id="replay" disabled>▶ Replay decoding</button>
+    </section>
+    <p class="empty" id="hood-empty">Record something on the <a href="#translate">Translate</a> tab and come back - or keep this tab open while it runs.</p>
+
+    <div id="hood-body" hidden>
+      <!-- timeline -->
+      <section class="card">
+        <h2 class="h"><span class="num">⏱</span>Where the time went</h2>
+        <div class="timeline" id="timeline"></div>
+      </section>
+
+      <!-- 1. front-end -->
+      <section class="card">
+        <h2 class="h"><span class="num">1</span>Cleaning the audio <small>our DSP front-end · asr/audio.py</small></h2>
+        <p class="explain">Microphones capture more than your voice: an electrical offset (DC), low rumble from desks and fans,
+          and long silences that make Whisper "hallucinate" words. Before any AI runs, we clean the signal with classic signal processing.</p>
+
+        <h3>Waveform: raw vs cleaned</h3>
+        <p class="explain sm">Each pixel column shows the loudest and quietest sample in that slice of time. Grey areas are the silence we trim away.</p>
+        <canvas class="plot" id="c-wave"></canvas>
+        <div class="legend-row"><i style="--c:var(--muted)"></i>raw input <i style="--c:var(--accent)"></i>after filter + normalisation <i style="--c:var(--trim)" class="box"></i>trimmed</div>
+
+        <div class="grid2">
+          <div>
+            <h3>Frequency content & the high-pass filter</h3>
+            <p class="explain sm">Average energy at each frequency (Welch's method). A 4th-order Butterworth filter removes everything below <b id="hp-hz"></b> Hz - below the lowest human voice - without touching speech.</p>
+            <canvas class="plot" id="c-spectrum"></canvas>
+            <div class="legend-row"><i style="--c:var(--muted)"></i>before <i style="--c:var(--accent)"></i>after <i style="--c:var(--warn)" class="dash"></i>filter gain</div>
+          </div>
+          <div>
+            <h3>Voice activity detection (VAD)</h3>
+            <p class="explain sm">The audio is cut into <b id="vad-ms"></b> ms frames and each frame's loudness is computed. Frames louder than the adaptive threshold count as speech.</p>
+            <canvas class="plot" id="c-vad"></canvas>
+            <div class="legend-row"><i style="--c:var(--ok)" class="box"></i>speech frame <i style="--c:var(--line2)" class="box"></i>silence <i style="--c:var(--err)" class="dash"></i>threshold <i style="--c:var(--muted)" class="dash"></i>noise floor</div>
+          </div>
+        </div>
+
+        <div class="formulas">
+          <code>loudness(frame) = 20·log₁₀( √(mean(x²)) )  dBFS</code>
+          <code>noise floor = 10th percentile of frame loudness</code>
+          <code>threshold = max(noise floor + 10 dB, −55 dB)</code>
+          <code>gain = min(−1 dBFS − peak, +30 dB)</code>
+        </div>
+        <dl class="numbers" id="n-clean"></dl>
+      </section>
+
+      <!-- 2. features -->
+      <section class="card">
+        <h2 class="h"><span class="num">2</span>Turning sound into a picture: the log-Mel spectrogram <small>asr/features.py</small></h2>
+        <p class="explain">Neural networks don't hear - they see numbers. Whisper converts audio into a <b>log-Mel spectrogram</b>: a picture of which pitches are
+          present at each moment, warped to match how human ears perceive pitch. We compute it ourselves, step by step, and check it against Whisper's own code.</p>
+
+        <ol class="chain" id="mel-chain"></ol>
+
+        <h3>One frame's journey <small id="frame-label"></small></h3>
+        <p class="explain sm">Here is the single loudest 25 ms slice of your recording going through each step.</p>
+        <div class="grid4">
+          <figure><canvas class="plot sm" id="c-frame"></canvas><figcaption><b>a.</b> 400 samples × Hann window (dashed) - softens the edges so the FFT doesn't see false clicks</figcaption></figure>
+          <figure><canvas class="plot sm" id="c-power"></canvas><figcaption><b>b.</b> FFT → power at 201 frequencies (0-8 kHz), in dB. Peaks are your voice's harmonics</figcaption></figure>
+          <figure><canvas class="plot sm" id="c-filters"></canvas><figcaption><b>c.</b> Mel filterbank (every 4th of <span class="n-mels"></span> shown): narrow at low pitch, wide at high - like the cochlea</figcaption></figure>
+          <figure><canvas class="plot sm" id="c-melvec"></canvas><figcaption><b>d.</b> Result: <span class="n-mels"></span> numbers, log-compressed and scaled. This column is what Whisper reads</figcaption></figure>
+        </div>
+
+        <h3>The full spectrogram - what Whisper actually sees</h3>
+        <p class="explain sm">Time runs left → right (one column every 10 ms), pitch runs bottom → top, brightness = energy. During decoding, the words Whisper found are placed at the times it heard them.</p>
+        <div class="mel-wrap"><canvas class="plot tall" id="c-mel"></canvas></div>
+        <dl class="numbers" id="n-mel"></dl>
+      </section>
+
+      <!-- 3. language -->
+      <section class="card">
+        <h2 class="h"><span class="num">3</span>Which language is this?</h2>
+        <p class="explain">Before writing anything, Whisper's decoder predicts a special language token from the first 30 s of audio. It scores every one of its
+          <b id="n-langs"></b> languages; these are the top candidates (probabilities sum to 100%).</p>
+        <div class="bars" id="lang-bars"></div>
+      </section>
+
+      <!-- 4. decoding -->
+      <section class="card">
+        <h2 class="h"><span class="num">4</span>Decoding: sound → tokens → words</h2>
+        <p class="explain">Whisper's encoder turns the spectrogram into 1,500 feature vectors. The decoder then writes text one <b>token</b> at a time
+          (a token is a word or word-piece from a vocabulary of <b id="n-vocab"></b>). <b>Beam search</b> keeps the <b id="n-beam"></b> most likely
+          partial sentences alive at every step and picks the best complete one. <span class="tag">replay</span> the animation re-plays the real tokens and timings.</p>
+
+        <h3>Tokens the model produced</h3>
+        <div class="tokens" id="tokens"></div>
+
+        <h3>Words, timings and probabilities</h3>
+        <p class="explain sm">A word's probability is the average of its tokens' probabilities - how sure the model was. Below <b id="n-lowthr"></b> we highlight it for you to check.</p>
+        <div class="word-table" id="word-table"></div>
+
+        <h3>Quality checks per segment</h3>
+        <div class="formulas">
+          <code>avg token prob = e^(avg log-prob)</code>
+          <code>compression ratio = len(text) / len(gzip(text))  - above 2.4 means repetitive gibberish → retry hotter</code>
+          <code>no-speech prob = P(&lt;|nospeech|&gt; token)</code>
+        </div>
+        <div id="segments"></div>
+      </section>
+
+      <!-- 5. translation -->
+      <section class="card">
+        <h2 class="h"><span class="num">5</span>Translation by a local LLM <small>translation/translator.py</small></h2>
+        <p class="explain">The transcript is sent to <b id="llm-name"></b> running on your GPU through Ollama. The model reads the instructions and the text
+          (the <i>prompt</i>), then generates the translation token by token - you can watch it type.</p>
+        <div class="grid2">
+          <div>
+            <h3>Prompt sent to the model</h3>
+            <div class="prompt"><span class="role">system</span><p id="p-system"></p><span class="role">user</span><p id="p-user"></p></div>
+          </div>
+          <div>
+            <h3>Model output <small>(live)</small></h3>
+            <div class="prompt out"><p id="p-out"></p></div>
+            <dl class="numbers" id="n-translate"></dl>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. speech -->
+      <section class="card">
+        <h2 class="h"><span class="num">6</span>Speech synthesis</h2>
+        <p class="explain">The translated text is turned back into audio by a neural text-to-speech voice. Speed and pitch are applied during generation.</p>
+        <canvas class="plot" id="c-out"></canvas>
+        <dl class="numbers" id="n-speak"></dl>
+      </section>
+    </div>
+  </main>
+
+  <!-- =================================================================== CONVERSATION PAGE -->
+  <main class="wrap page talk" id="page-talk" hidden>
+    <section class="card">
+      <div class="talk-setup">
+        <div class="person a">
+          <span class="who">Person A</span>
+          <label class="field"><span>Speaks</span><select id="tk-lang-a"></select></label>
+          <label class="field"><span>Their words are spoken with</span><select id="tk-voice-a"></select></label>
+        </div>
+        <button class="icon-btn" id="tk-swap" title="Swap people" aria-label="Swap people">
+          <svg viewBox="0 0 24 24"><path d="M7 7h11l-3-3M17 17H6l3 3" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="person b">
+          <span class="who">Person B</span>
+          <label class="field"><span>Speaks</span><select id="tk-lang-b"></select></label>
+          <label class="field"><span>Their words are spoken with</span><select id="tk-voice-b"></select></label>
+        </div>
+      </div>
+      <div class="talk-mode">
+        <div class="seg-toggle" role="group" aria-label="Mode">
+          <button data-mode="ptt" class="on">Push to talk</button><button data-mode="auto">Hands-free</button>
+        </div>
+        <p class="explain sm" id="tk-mode-help"></p>
+      </div>
+
+      <!-- push to talk -->
+      <div class="ptt" id="tk-ptt">
+        <button class="ptt-btn a" id="tk-btn-a"><span class="dot"></span><b>A speaks</b><small id="tk-btn-a-lang"></small></button>
+        <button class="ptt-btn b" id="tk-btn-b"><span class="dot"></span><b>B speaks</b><small id="tk-btn-b-lang"></small></button>
+      </div>
+
+      <!-- hands-free -->
+      <div class="handsfree" id="tk-auto" hidden>
+        <button class="btn listen-btn" id="tk-listen">● Start listening</button>
+        <div class="vad">
+          <div class="vad-meter"><i id="tk-level"></i><span class="mark thr" id="tk-thr"></span><span class="mark floor" id="tk-floor"></span></div>
+          <div class="vad-state"><span class="state-dot" id="tk-state-dot"></span><span id="tk-state">Not listening</span><span class="mono" id="tk-db"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card chat-card">
+      <div class="results-head">
+        <h2 class="h">Conversation</h2>
+        <div class="inline">
+          <button class="btn ghost" id="tk-export">Export</button>
+          <button class="btn ghost" id="tk-clear">Clear</button>
+        </div>
+      </div>
+      <div class="chat" id="tk-chat"><p class="placeholder" id="tk-empty">Nothing said yet. Pick the two languages, then press <b>A speaks</b> or switch to hands-free.</p></div>
+    </section>
+  </main>
+
+  <!-- =================================================================== SUMMARY PAGE -->
+  <main class="wrap page summary" id="page-summary" hidden>
+    <section class="card">
+      <h2 class="h">Summarize a long recording</h2>
+      <p class="explain">Lectures, meetings, podcasts, voice notes - even videos. Whisper transcribes it, the local LLM writes the
+        summary, chapters and action items. Everything stays on this computer.</p>
+      <div class="sm-inputs">
+        <label class="dropzone" id="sm-drop">
+          <input type="file" id="sm-file" accept="audio/*,video/*" hidden />
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <b>Drop an audio or video file here</b><small>or click to choose · mp3, wav, m4a, ogg, mp4, mkv, mov… up to 3 hours</small>
+        </label>
+        <div class="or">or</div>
+        <div class="long-rec">
+          <button class="btn rec-btn" id="sm-record">● Record live</button>
+          <span class="mono" id="sm-rec-timer">no time limit</span>
+        </div>
+      </div>
+      <div class="sm-picked" id="sm-picked" hidden><span id="sm-picked-name"></span><button class="link-btn" id="sm-clear-file">remove</button></div>
+      <div class="sm-options">
+        <label class="field"><span>Spoken language</span><select id="sm-lang"><option value="auto">Auto-detect</option></select></label>
+        <label class="field"><span>Write the summary in</span><select id="sm-out"><option value="same">Same language as the recording</option></select></label>
+        <label class="check-row"><input type="checkbox" id="sm-speak" checked /> Read the TL;DR aloud</label>
+        <label class="check-row" id="sm-myvoice-row" hidden><input type="checkbox" id="sm-myvoice" /> in my own voice</label>
+      </div>
+      <button class="btn big" id="sm-go" disabled>Summarize</button>
+    </section>
+
+    <section class="card" id="sm-progress" hidden>
+      <ol class="vl-steps" id="sm-steps">
+        <li data-s="prepare"><span class="node"></span><div><b>Prepare audio</b><small id="sm-prep-sub">decode (video too) + clean</small></div><em></em></li>
+        <li data-s="transcribe"><span class="node"></span><div><b>Transcribe</b><small id="sm-tr-sub">Whisper, 30-second windows, silence skipped by VAD</small></div><em></em></li>
+        <li data-s="summarize"><span class="node"></span><div><b>Summarize</b><small id="sm-sum-sub">LLM map → reduce</small></div><em></em></li>
+        <li data-s="speak"><span class="node"></span><div><b>Read aloud</b><small>neural voice</small></div><em></em></li>
+      </ol>
+      <div class="vl-progress run"><i id="sm-bar"></i></div>
+      <div class="live-transcript" id="sm-live"></div>
+    </section>
+
+    <section class="card" id="sm-results" hidden>
+      <div class="results-head">
+        <h2 class="h">Summary</h2>
+        <div class="inline">
+          <button class="btn ghost" id="sm-exp-md">Markdown</button>
+          <button class="btn ghost" id="sm-exp-txt">Transcript</button>
+          <button class="btn ghost" id="sm-exp-srt">Subtitles (.srt)</button>
+        </div>
+      </div>
+      <audio controls id="sm-audio" class="sm-player"></audio>
+      <div class="tldr">
+        <span class="role">TL;DR</span>
+        <p id="sm-tldr"></p>
+        <button class="btn ghost" id="sm-play-tldr" hidden>▶ Listen</button>
+      </div>
+      <div class="grid2">
+        <div><h3>Key points</h3><ul class="points" id="sm-points"></ul></div>
+        <div><h3>Action items</h3><ul class="todo" id="sm-actions"></ul></div>
+      </div>
+      <h3>Chapters <small>click to jump</small></h3>
+      <div class="chapters" id="sm-chapters"></div>
+
+      <details class="howto">
+        <summary>How this summary was made</summary>
+        <p class="explain sm">The transcript is too long for a small model to read well in one go, so it's summarised in two rounds
+          (<b>map-reduce</b>): first each chunk of a few minutes gets its own notes, title and action items; then the model reads only
+          those notes to write the final summary. Each chunk's title + start time became a chapter.</p>
+        <dl class="numbers" id="sm-how"></dl>
+        <div id="sm-parts"></div>
+      </details>
+
+      <div class="results-head transcript-head">
+        <h3>Transcript</h3>
+        <input type="search" id="sm-search" placeholder="Search the transcript…" aria-label="Search the transcript" />
+      </div>
+      <div class="transcript-list" id="sm-transcript"></div>
+    </section>
+  </main>
+
+  <!-- =================================================================== BENCHMARK PAGE -->
+  <main class="wrap page bench" id="page-bench" hidden>
+    <section class="card hood-intro">
+      <div>
+        <h1>Benchmark: how accurate is the ASR on your voice?</h1>
+        <p>Read sentences we already know the text of, then let every Whisper model transcribe them. Comparing what you
+          <i>said</i> with what the model <i>heard</i> gives real accuracy numbers - for your voice, your mic, your room.</p>
+        <div class="defs">
+          <span><b>WER</b> % of words wrong (lower is better)</span>
+          <span><b>CER</b> % of characters wrong</span>
+          <span><b>RTF</b> processing time ÷ audio length (0.1 = 10× faster than real time)</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 1. record -->
+    <section class="card">
+      <h2 class="h"><span class="num">1</span>Record your test set</h2>
+      <p class="explain">Read each sentence exactly as written, in your normal voice. Say numbers the way you naturally would.
+        About <b>30 recordings</b> give stable results; more is better. Recordings stay on this computer (git-ignored).</p>
+      <div class="bench-top">
+        <div class="seg-toggle" role="group" aria-label="Test language">
+          <button data-lang="en" class="on">English</button><button data-lang="hi">Hindi</button>
+        </div>
+        <div class="bench-progress"><div class="meter"><i id="bt-bar"></i></div><span class="mono" id="bt-count"></span></div>
+      </div>
+      <div class="prompt-card" id="bt-card">
+        <small id="bt-index"></small>
+        <p id="bt-text"></p>
+        <span class="badge" id="bt-done" hidden>✓ recorded</span>
+      </div>
+      <div class="vl-rec">
+        <button class="btn ghost" id="bt-prev">← Prev</button>
+        <button class="btn rec-btn" id="bt-record">● Record</button>
+        <button class="btn ghost" id="bt-next">Skip →</button>
+        <span class="mono" id="bt-timer"></span>
+      </div>
+      <div class="vl-level"><i id="bt-level"></i></div>
+      <p class="explain sm">Shortcuts: <kbd>Space</kbd> record / stop, <kbd>←</kbd> <kbd>→</kbd> move between sentences.</p>
+      <details class="bt-list"><summary id="bt-list-title">Recorded sentences</summary><div id="bt-items"></div></details>
+    </section>
+
+    <!-- 2. run -->
+    <section class="card">
+      <h2 class="h"><span class="num">2</span>Run the benchmark</h2>
+      <p class="explain">Each selected model transcribes every recording - once with our audio cleaning and once on the raw audio, so you can
+        see whether the front-end helps. Models not used before are downloaded once.</p>
+      <div class="model-picks" id="bt-models"></div>
+      <label class="check-row"><input type="checkbox" id="bt-compare" checked /> Compare with and without our audio cleaning</label>
+      <div class="vl-rec"><button class="btn" id="bt-run">Run benchmark</button><span class="explain sm" id="bt-status"></span></div>
+      <div class="vl-progress run" id="bt-run-progress" hidden><i id="bt-run-bar"></i></div>
+    </section>
+
+    <!-- 3. results -->
+    <section class="card" id="bt-results" hidden>
+      <div class="results-head">
+        <h2 class="h"><span class="num">3</span>Results</h2>
+        <div class="inline">
+          <select id="bt-run-select" aria-label="Benchmark run"></select>
+          <button class="btn ghost" id="bt-copy">Copy as Markdown</button>
+        </div>
+      </div>
+      <div class="warn-box" id="bt-warn" hidden></div>
+      <div class="table-wrap"><table class="bench-table" id="bt-table"></table></div>
+
+      <div class="grid2">
+        <div>
+          <h3>Word error rate by model</h3>
+          <p class="explain sm">Lower is better. Blue = with our audio cleaning, orange = raw audio.</p>
+          <div class="legend-row"><i class="box" style="--c:var(--s1)"></i>cleaned <i class="box" style="--c:var(--s2)"></i>raw audio</div>
+          <canvas class="plot" id="bt-chart-wer"></canvas>
+        </div>
+        <div>
+          <h3>Speed vs accuracy</h3>
+          <p class="explain sm">Bottom-left is best: fast <i>and</i> accurate. Each dot is one configuration.</p>
+          <div class="legend-row"><i class="box" style="--c:var(--s1)"></i>cleaned <i class="box" style="--c:var(--s2)"></i>raw audio</div>
+          <canvas class="plot" id="bt-chart-speed"></canvas>
+        </div>
+      </div>
+
+      <h3>Can you trust the confidence scores? <select id="bt-cal-config" aria-label="Configuration"></select></h3>
+      <p class="explain sm">Every word Whisper wrote is grouped by the confidence it gave, then we check how many were actually right.
+        A trustworthy model is right far more often when it's confident. The dashed line is the app's highlight threshold.</p>
+      <div class="grid2 cal">
+        <canvas class="plot" id="bt-chart-cal"></canvas>
+        <dl class="numbers" id="bt-cal-numbers"></dl>
+      </div>
+
+      <h3>Hardest sentences <small id="bt-worst-label"></small></h3>
+      <div id="bt-worst"></div>
+    </section>
+  </main>
+  <div class="tooltip" id="tooltip" hidden></div>
+
+  <!-- =================================================================== VOICE LAB (modal) -->
+  <div class="modal" id="voice-modal" hidden role="dialog" aria-modal="true" aria-labelledby="vl-title">
+    <div class="modal-card">
+      <header class="modal-head">
+        <h2 id="vl-title">Add your voice</h2>
+        <button class="icon-btn" id="vl-close" aria-label="Close">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+
+      <!-- step 1: script + recording -->
+      <section id="vl-step-record">
+        <p class="explain">The translator can speak in <b>your</b> voice. It needs about 30 seconds of you reading a script.
+          The script is generated to contain as many different speech sounds as possible, plus a question, an exclamation and
+          numbers - so the model hears your full range of tones. Your recording never leaves this computer.</p>
+        <div id="vl-saved"></div>
+        <div class="vl-form">
+          <label class="field grow"><span>Voice name</span><input id="vl-name" maxlength="40" placeholder="e.g. My voice" /></label>
+          <label class="field"><span>Script language</span>
+            <select id="vl-lang"><option value="en">English</option><option value="hi">Hindi</option></select>
+          </label>
+          <button class="btn" id="vl-generate">Generate script</button>
+        </div>
+        <p class="explain sm" id="vl-langs"></p>
+
+        <div id="vl-script" hidden>
+          <div class="vl-stats" id="vl-stats"></div>
+          <ol class="teleprompter" id="vl-lines"></ol>
+          <ul class="tips">
+            <li>Quiet room, phone and fans off. Sit about a hand's width (15-20 cm) from the mic.</li>
+            <li>Read naturally, the way you'd talk to a friend - pauses between lines are fine.</li>
+            <li>Press <kbd>Enter</kbd> or <b>Next line</b> to move the highlight while you read.</li>
+          </ul>
+          <div class="vl-rec">
+            <button class="btn rec-btn" id="vl-record">● Start recording</button>
+            <button class="btn ghost" id="vl-next" hidden>Next line ↵</button>
+            <button class="btn ghost" id="vl-reroll">New script</button>
+            <span class="mono" id="vl-timer">0.0 s</span>
+          </div>
+          <div class="vl-progress" title="Recording length">
+            <i id="vl-prog"></i><span class="mark" style="left:25%">10 s min</span><span class="mark" style="left:50%">20 s good</span><span class="mark" style="left:75%">30 s ideal</span>
+          </div>
+          <div class="vl-level"><i id="vl-level"></i></div>
+        </div>
+      </section>
+
+      <!-- step 2: checks + result -->
+      <section id="vl-step-result" hidden>
+        <ol class="vl-steps" id="vl-steps">
+          <li data-s="analyse"><span class="node"></span><div><b>Analyse audio</b><small>our front-end: length, noise, clipping</small></div><em></em></li>
+          <li data-s="check"><span class="node"></span><div><b>Check the reading</b><small>Whisper transcribes it, we compute WER vs the script</small></div><em></em></li>
+          <li data-s="profile"><span class="node"></span><div><b>Build voice profile</b><small id="vl-profile-sub">XTTS-v2 speaker embedding + style latents</small></div><em></em></li>
+          <li data-s="test"><span class="node"></span><div><b>Speak a test sentence</b><small>in your new voice</small></div><em></em></li>
+        </ol>
+        <div class="vl-checks" id="vl-checks"></div>
+        <div id="vl-diff-wrap" hidden>
+          <h3>What Whisper heard vs the script</h3>
+          <p class="explain sm"><span class="d-ok">matched</span> <span class="d-sub">different</span> <span class="d-del">missed</span> <span class="d-ins">extra</span></p>
+          <div class="vl-diff" id="vl-diff"></div>
+        </div>
+        <div class="vl-test" id="vl-test" hidden>
+          <h3>Here's you, cloned</h3>
+          <audio controls id="vl-audio"></audio>
+          <p class="explain sm" id="vl-profile-info"></p>
+        </div>
+        <div class="actions">
+          <button class="btn ghost" id="vl-retry">Record again</button>
+          <button class="btn" id="vl-use" hidden>Use this voice</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="alert" hidden></div>
+  <script src="/static/viz.js"></script>
+  <script src="/static/app.js"></script>
+  <script src="/static/voicelab.js"></script>
+  <script src="/static/bench.js"></script>
+  <script src="/static/conversation.js"></script>
+  <script src="/static/summary.js"></script>
+</body>
+</html>

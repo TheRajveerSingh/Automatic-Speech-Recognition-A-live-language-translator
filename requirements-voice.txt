@@ -1,0 +1,22 @@
+# OPTIONAL: "speak in my own voice" (XTTS-v2 voice cloning). ~3 GB of packages + ~1.9 GB model.
+#   conda activate asr-translate
+#   pip install -r requirements-voice.txt
+#
+# To remove it all again:
+#   pip uninstall -y coqui-tts coqui-tts-trainer torch torchaudio torchcodec
+#   and delete the XTTS model (1.75 GB), which coqui stores in the Hugging Face cache:
+#     %USERPROFILE%\.cache\huggingface\hub\models--tts-hub--XTTS-v2
+#   (the empty  models/  folder in this project can go too)
+#
+# XTTS-v2 model licence: Coqui Public Model License - free for NON-commercial use.
+
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.11.0+cu128        # GPU build (CUDA 12.8); plain PyPI only has CPU builds for Windows
+torchaudio==2.11.0+cu128
+coqui-tts==0.28.0          # maintained fork of Coqui TTS, contains XTTS-v2
+torchcodec==0.11.1         # coqui refuses to import without it on torch>=2.9; we load audio ourselves,
+                           # so its FFmpeg code is never actually used
+six                        # used by coqui-tts but missing from its declared dependencies
+pypinyin                   # XTTS needs it to read Chinese; also not installed by coqui-tts
+cutlet==0.5.2              # XTTS needs it to read Japanese (kanji -> romaji)
+unidic-lite==1.0.8         # Japanese dictionary used by cutlet

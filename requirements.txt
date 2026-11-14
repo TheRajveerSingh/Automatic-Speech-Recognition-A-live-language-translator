@@ -1,0 +1,27 @@
+# Install INSIDE the conda env (never in base):
+#   conda activate asr-translate
+#   pip install -r requirements.txt
+
+# --- Speech recognition (ASR) ---
+faster-whisper==1.2.1          # Whisper re-implemented on CTranslate2: ~4x faster, less VRAM
+nvidia-cublas-cu12==12.9.2.10  # CUDA math library the GPU build of faster-whisper needs
+nvidia-cudnn-cu12==9.28.1.4    # CUDA neural-net library the GPU build of faster-whisper needs
+
+# --- Audio processing (our own preprocessing code uses these) ---
+numpy==2.4.6
+scipy==1.17.1                  # filters + resampling
+
+# --- Translation (talks to the local Ollama server) ---
+httpx==0.28.1
+
+# --- Text to speech ---
+edge-tts==7.3.1
+
+# --- Web app ---
+fastapi==0.162.7
+uvicorn[standard]==0.54.0
+python-multipart==0.0.33       # lets FastAPI receive uploaded audio files
+python-dotenv==1.2.4           # reads optional settings from .env
+
+# --- Accuracy benchmark ---
+num2words==0.5.14              # "42" -> "forty two" so digits and words compare equal in WER
