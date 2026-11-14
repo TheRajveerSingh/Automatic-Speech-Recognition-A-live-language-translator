@@ -1,5 +1,7 @@
 # Voice Translator - ASR + Translation
 
+[![tests](https://github.com/TheRajveerSingh/Automatic-Speech-Recognition-A-live-language-translator/actions/workflows/tests.yml/badge.svg)](https://github.com/TheRajveerSingh/Automatic-Speech-Recognition-A-live-language-translator/actions/workflows/tests.yml)
+
 A local speech-recognition app: speak in one language, hear it in another - in a neural voice or **your own
 cloned voice**. Hold two-way conversations, summarise hour-long recordings, and measure the ASR's accuracy on
 your own voice. Everything except the Edge voices runs on your own GPU.
@@ -67,6 +69,15 @@ Open http://localhost:8000 in Chrome or Edge and wait for the green dot.
 
 - Terminal translation test: `python pipeline.py some_audio.wav hi`
 - Terminal benchmark: `python -m eval.evaluate_wer --models tiny,small,large-v3-turbo`
+
+## Tests
+64 automated tests cover the logic that doesn't need a GPU: WER/CER scoring and text normalisation, number spelling
+for Hindi/Chinese voice cloning, the audio front-end (filter, normalisation, VAD) on synthetic signals, the voice-enrolment
+script and checks, and transcript chunking for summaries. They run on GitHub on every push (badge above).
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
 
 ## Accuracy on my voice
 _Coming soon: measured on my own recordings with the Benchmark tab (30+ sentences)._

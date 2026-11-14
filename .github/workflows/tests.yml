@@ -1,0 +1,26 @@
+# Runs the unit tests on GitHub for every push and pull request.
+# Only the light libraries the tested code needs are installed - no GPU, Whisper or PyTorch.
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ffmpeg (used by the audio front-end tests)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install test dependencies
+        run: pip install numpy==2.4.6 scipy==1.17.1 python-dotenv==1.2.4 num2words==0.5.14 httpx==0.28.1 -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest -v

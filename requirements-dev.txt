@@ -1,0 +1,2 @@
+# For running the automated tests:   pip install -r requirements-dev.txt   then   pytest
+pytest==9.2.0
