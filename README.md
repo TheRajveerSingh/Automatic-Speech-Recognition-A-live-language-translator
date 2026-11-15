@@ -6,6 +6,8 @@ A local speech-recognition app: speak in one language, hear it in another - in a
 cloned voice**. Hold two-way conversations, summarise hour-long recordings, and measure the ASR's accuracy on
 your own voice. Everything except the Edge voices runs on your own GPU.
 
+📖 **For more detailed information, go to this file: [Detailed Information about the Project](Detailed-Information-about-the-Project.md)**, a screen-by-screen walkthrough of the app and an explanation of every file.
+
 ```
 mic ─► Clean audio ─► log-Mel ─► Recognize ─► Translate ─► Speak
        (our DSP+VAD)  (our code)  (Whisper)   (Ollama LLM)  (Edge voices / XTTS your voice)
